@@ -10,3 +10,5 @@ wheels/
 .venv
 mlflow.db
 mlruns
+
+uv.lock
