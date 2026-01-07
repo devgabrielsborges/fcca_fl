@@ -1,0 +1,36 @@
+experiment:
+  name: fcca_mnist_baseline
+  seed: 42
+
+data:
+  dataset: mnist
+  data_dir: ./data
+  num_clients: 10
+  partition_method: clustered
+  num_shards_per_client: 2
+  dirichlet_alpha: 0.5
+
+model:
+  latent_dim: 64
+  encoder_hidden_dims: [128, 256, 512]
+  classifier_hidden_dims: [256, 128]
+  cinn_num_blocks: 4
+  cinn_hidden_dim: 128
+
+training:
+  num_rounds: 100
+  num_clusters: 5
+  batch_size: 32
+  local_epochs: 5
+  cinn_lr: 0.0001
+  encoder_classifier_lr: 0.001
+  clustering_interval: 10
+  warmup_rounds: 10
+
+mlflow:
+  tracking_uri: ./mlruns
+  experiment_name: fcca_experiments
+
+output:
+  model_dir: ./models
+  results_dir: ./results
