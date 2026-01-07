@@ -90,13 +90,11 @@ set_seed(42)
 # Configure MLflow tracking
 import os
 from pathlib import Path
-
-# Set tracking URI to use SQLite database
-mlflow_db_path = Path(__file__).parent.parent / "mlflow.db"
+mlflow_db_path = os.getenv("MLFLOW_DB_PATH")
 mlflow.set_tracking_uri(f"sqlite:///{mlflow_db_path}")
 
 # Create or get experiment
-experiment_name = "FCCA-FL"
+experiment_name = "FCCA-Federated-Learning"
 try:
     experiment = mlflow.get_experiment_by_name(experiment_name)
     if experiment is None:
@@ -138,31 +136,43 @@ def load_dataset(name: str, data_dir: str = "./data", train: bool = True):
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
         )
-        return datasets.MNIST(root=data_dir, train=train, download=True, transform=transform)
+        return datasets.MNIST(
+            root=data_dir, train=train, download=True, transform=transform
+        )
 
     elif name.lower() == "fashion_mnist" or name.lower() == "fmnist":
         transform = transforms.Compose(
             [transforms.ToTensor(), transforms.Normalize((0.2860,), (0.3530,))]
         )
-        return datasets.FashionMNIST(root=data_dir, train=train, download=True, transform=transform)
+        return datasets.FashionMNIST(
+            root=data_dir, train=train, download=True, transform=transform
+        )
 
     elif name.lower() == "cifar10":
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                transforms.Normalize(
+                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                ),
             ]
         )
-        return datasets.CIFAR10(root=data_dir, train=train, download=True, transform=transform)
+        return datasets.CIFAR10(
+            root=data_dir, train=train, download=True, transform=transform
+        )
 
     elif name.lower() == "cifar100":
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
+                transforms.Normalize(
+                    (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
+                ),
             ]
         )
-        return datasets.CIFAR100(root=data_dir, train=train, download=True, transform=transform)
+        return datasets.CIFAR100(
+            root=data_dir, train=train, download=True, transform=transform
+        )
 
     elif name.lower() == "synthetic":
         # Synthetic dataset from FedProx paper
@@ -256,7 +266,9 @@ def dirichlet_partition(
         for original_label in range(num_classes):
             # Randomly exchange some labels to simulate clustered FL setting
             if np.random.rand() < 0.3:  # 30% label exchange rate
-                new_label = (original_label + np.random.randint(1, num_classes)) % num_classes
+                new_label = (
+                    original_label + np.random.randint(1, num_classes)
+                ) % num_classes
                 cluster_label_map[cluster_id][original_label] = new_label
             else:
                 cluster_label_map[cluster_id][original_label] = original_label
@@ -266,9 +278,9 @@ def dirichlet_partition(
     ground_truth_clusters = []
 
     # Validate labels are in valid range
-    assert (
-        labels.min() >= 0 and labels.max() < num_classes
-    ), f"Invalid labels: min={labels.min()}, max={labels.max()}, num_classes={num_classes}"
+    assert labels.min() >= 0 and labels.max() < num_classes, (
+        f"Invalid labels: min={labels.min()}, max={labels.max()}, num_classes={num_classes}"
+    )
 
     for cluster_id in range(num_clusters):
         # Partition using Dirichlet distribution
@@ -382,7 +394,9 @@ class CNNEncoder(nn.Module):
         )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Sequential(nn.Linear(512, 256), nn.ReLU(), nn.Linear(256, latent_dim))
+        self.fc = nn.Sequential(
+            nn.Linear(512, 256), nn.ReLU(), nn.Linear(256, latent_dim)
+        )
 
     def forward(self, x):
         x = self.features(x)
@@ -445,7 +459,9 @@ class ConditionalINN(nn.Module):
                     name=f"coupling_{k}",
                 )
             )
-            nodes.append(Ff.Node(nodes[-1], Fm.PermuteRandom, {"seed": k}, name=f"permute_{k}"))
+            nodes.append(
+                Ff.Node(nodes[-1], Fm.PermuteRandom, {"seed": k}, name=f"permute_{k}")
+            )
 
         nodes.append(Ff.OutputNode(nodes[-1], name="output"))
 
@@ -533,7 +549,9 @@ print("Model architectures ready: 11-layer MLP and 18-layer CNN")
 class FederatedClient:
     """Generic federated learning client"""
 
-    def __init__(self, client_id: int, dataset: Dataset, indices: List[int], device: str = "cpu"):
+    def __init__(
+        self, client_id: int, dataset: Dataset, indices: List[int], device: str = "cpu"
+    ):
         self.client_id = client_id
         self.dataset = Subset(dataset, indices)
         self.device = device
@@ -599,7 +617,9 @@ class FederatedClient:
 class FedAvg:
     """FedAvg baseline"""
 
-    def __init__(self, clients: List[FederatedClient], model: nn.Module, device: str = "cpu"):
+    def __init__(
+        self, clients: List[FederatedClient], model: nn.Module, device: str = "cpu"
+    ):
         self.clients = clients
         self.global_model = model.to(device)
         self.device = device
@@ -637,7 +657,9 @@ class FedAvg:
 
                 # Update progress every 10 clients
                 if (i + 1) % 10 == 0:
-                    pbar.set_postfix({"client": f"{i + 1}/{len(self.clients)}"}, refresh=True)
+                    pbar.set_postfix(
+                        {"client": f"{i + 1}/{len(self.clients)}"}, refresh=True
+                    )
 
             # Aggregate
             self.aggregate(client_weights, client_sizes)
@@ -646,7 +668,9 @@ class FedAvg:
             if test_loader is not None and round_idx % 10 == 0:
                 acc = self.evaluate(test_loader)
                 self.history["test_acc"].append(acc)
-                pbar.set_postfix({"round": round_idx, "acc": f"{acc:.4f}"}, refresh=True)
+                pbar.set_postfix(
+                    {"round": round_idx, "acc": f"{acc:.4f}"}, refresh=True
+                )
 
         return self.history
 
@@ -693,7 +717,9 @@ class IFCA:
         self.num_clusters = num_clusters
         self.device = device
         # Initialize cluster models randomly
-        self.cluster_models = [copy.deepcopy(model).to(device) for _ in range(num_clusters)]
+        self.cluster_models = [
+            copy.deepcopy(model).to(device) for _ in range(num_clusters)
+        ]
         self.client_clusters = [0] * len(clients)  # Initial cluster assignment
         self.history = {"test_acc": [], "cluster_assignments": []}
 
@@ -715,7 +741,9 @@ class IFCA:
                 for k in range(self.num_clusters):
                     model = self.cluster_models[k]
                     model.eval()
-                    loader = DataLoader(client.dataset, batch_size=batch_size, shuffle=False)
+                    loader = DataLoader(
+                        client.dataset, batch_size=batch_size, shuffle=False
+                    )
                     criterion = nn.CrossEntropyLoss()
                     total_loss = 0
 
@@ -734,7 +762,9 @@ class IFCA:
 
             # Step 2: Train cluster models
             for k in range(self.num_clusters):
-                cluster_clients = [i for i, c in enumerate(self.client_clusters) if c == k]
+                cluster_clients = [
+                    i for i, c in enumerate(self.client_clusters) if c == k
+                ]
                 if not cluster_clients:
                     continue
 
@@ -755,7 +785,9 @@ class IFCA:
             if test_loader is not None and round_idx % 10 == 0:
                 acc = self.evaluate(test_loader)
                 self.history["test_acc"].append(acc)
-                self.history["cluster_assignments"].append(copy.copy(self.client_clusters))
+                self.history["cluster_assignments"].append(
+                    copy.copy(self.client_clusters)
+                )
 
         return self.history
 
@@ -818,7 +850,9 @@ class CFL:
         self.client_clusters = None
         self.history = {"test_acc": []}
 
-    def compute_gradient_similarity(self, local_epochs: int, batch_size: int, lr: float):
+    def compute_gradient_similarity(
+        self, local_epochs: int, batch_size: int, lr: float
+    ):
         """Compute gradient-based similarity between clients"""
         client_gradients = []
 
@@ -851,7 +885,9 @@ class CFL:
         for round_idx in tqdm(range(num_rounds), desc="CFL"):
             # Clustering phase
             if round_idx % cluster_every == 0:
-                distance_matrix = self.compute_gradient_similarity(local_epochs, batch_size, lr)
+                distance_matrix = self.compute_gradient_similarity(
+                    local_epochs, batch_size, lr
+                )
                 clustering = AgglomerativeClustering(
                     n_clusters=self.num_clusters,
                     metric="precomputed",
@@ -862,7 +898,9 @@ class CFL:
             # Training phase per cluster
             cluster_models = {}
             for k in range(self.num_clusters):
-                cluster_clients = [i for i, c in enumerate(self.client_clusters) if c == k]
+                cluster_clients = [
+                    i for i, c in enumerate(self.client_clusters) if c == k
+                ]
                 if not cluster_clients:
                     continue
 
@@ -960,7 +998,9 @@ class FLHC:
             # Train within clusters
             cluster_models = {}
             for k in range(self.num_clusters):
-                cluster_clients = [i for i, c in enumerate(self.client_clusters) if c == k]
+                cluster_clients = [
+                    i for i, c in enumerate(self.client_clusters) if c == k
+                ]
                 if not cluster_clients:
                     continue
 
@@ -1056,7 +1096,9 @@ class FeSEM:
         self.clients = clients
         self.num_clusters = num_clusters
         self.device = device
-        self.cluster_models = [copy.deepcopy(model).to(device) for _ in range(num_clusters)]
+        self.cluster_models = [
+            copy.deepcopy(model).to(device) for _ in range(num_clusters)
+        ]
         self.client_cluster_probs = np.ones((len(clients), num_clusters)) / num_clusters
         self.history = {"test_acc": []}
 
@@ -1136,7 +1178,9 @@ class FeSEM:
             for key in global_dict.keys():
                 global_dict[key] = torch.zeros_like(global_dict[key])
                 for i, client_dict in enumerate(client_weights):
-                    global_dict[key] += client_dict[key] * (client_weights_values[i] / total_weight)
+                    global_dict[key] += client_dict[key] * (
+                        client_weights_values[i] / total_weight
+                    )
 
             self.cluster_models[k].load_state_dict(global_dict)
 
@@ -1249,7 +1293,9 @@ class FCCAClient:
 
         return total_loss / (epochs * len(loader))
 
-    def train_encoder_classifier(self, lr: float = 1e-3, epochs: int = 5, batch_size: int = 64):
+    def train_encoder_classifier(
+        self, lr: float = 1e-3, epochs: int = 5, batch_size: int = 64
+    ):
         """Train encoder and classifier"""
         self.encoder.train()
         self.classifier.train()
@@ -1330,7 +1376,9 @@ class FCCAClient:
 class FCCA:
     """Federated cINN Clustering Algorithm"""
 
-    def __init__(self, clients: List[FCCAClient], num_clusters: int, device: str = "cpu"):
+    def __init__(
+        self, clients: List[FCCAClient], num_clusters: int, device: str = "cpu"
+    ):
         self.clients = clients
         self.num_clusters = num_clusters
         self.device = device
@@ -1351,12 +1399,16 @@ class FCCA:
         for round_idx in tqdm(range(num_rounds), desc="FCCA"):
             # Step 1: Clients train cINN locally with frozen encoder (Algorithm 1, lines 3-7)
             for client in self.clients:
-                client.train_cinn(lr=cinn_lr, epochs=local_epochs, batch_size=batch_size, alpha=1.0)
+                client.train_cinn(
+                    lr=cinn_lr, epochs=local_epochs, batch_size=batch_size, alpha=1.0
+                )
 
             # Step 2: Clustering every Δ rounds (Algorithm 1, lines 7-10)
             if round_idx % clustering_interval == 0:
                 self.cluster_clients()
-                self.history["cluster_assignments"].append([c.cluster_id for c in self.clients])
+                self.history["cluster_assignments"].append(
+                    [c.cluster_id for c in self.clients]
+                )
                 if round_idx > 0:
                     print(
                         f"Round {round_idx}: Updated clusters - {np.bincount([c.cluster_id for c in self.clients])}"
@@ -1372,7 +1424,9 @@ class FCCA:
                 )
                 client_encoders.append(copy.deepcopy(client.encoder.state_dict()))
                 cluster_classifiers[client.cluster_id].append(
-                    copy.deepcopy(client.classifier.get_classifier(client.cluster_id).state_dict())
+                    copy.deepcopy(
+                        client.classifier.get_classifier(client.cluster_id).state_dict()
+                    )
                 )
 
             # Step 4: Server aggregates per cluster (Algorithm 1, lines 11-13)
@@ -1401,7 +1455,9 @@ class FCCA:
         for i, client in enumerate(self.clients):
             client.cluster_id = int(cluster_labels[i])
 
-    def aggregate(self, client_encoders: List[Dict], cluster_classifiers: Dict[int, List[Dict]]):
+    def aggregate(
+        self, client_encoders: List[Dict], cluster_classifiers: Dict[int, List[Dict]]
+    ):
         """Aggregate encoder per cluster and cluster-wise classifiers"""
         # Per Algorithm 1: Aggregate encoder within each cluster (not globally)
         for cluster_id in range(self.num_clusters):
@@ -1414,7 +1470,9 @@ class FCCA:
                 continue
 
             # Aggregate encoder for this cluster
-            cluster_encoder_dict = copy.deepcopy(client_encoders[cluster_client_indices[0]])
+            cluster_encoder_dict = copy.deepcopy(
+                client_encoders[cluster_client_indices[0]]
+            )
             for key in cluster_encoder_dict.keys():
                 cluster_encoder_dict[key] = torch.zeros_like(cluster_encoder_dict[key])
                 for idx in cluster_client_indices:
@@ -1434,7 +1492,9 @@ class FCCA:
 
             global_classifier_dict = copy.deepcopy(classifier_list[0])
             for key in global_classifier_dict.keys():
-                global_classifier_dict[key] = torch.zeros_like(global_classifier_dict[key])
+                global_classifier_dict[key] = torch.zeros_like(
+                    global_classifier_dict[key]
+                )
                 for clf_dict in classifier_list:
                     global_classifier_dict[key] += clf_dict[key] / len(classifier_list)
 
@@ -1564,7 +1624,8 @@ class ExperimentRunner:
         set_seed(seed)
         print(f"\n{'=' * 80}")
         print(
-            f"Running: {algorithm.upper()} on " f"{dataset_name.upper()} with {model_type.upper()}"
+            f"Running: {algorithm.upper()} on "
+            f"{dataset_name.upper()} with {model_type.upper()}"
         )
         print(f"{'=' * 80}")
 
@@ -1801,7 +1862,9 @@ class ExperimentRunner:
 
         # Train
         cfl = CFL(clients, model, num_clusters, self.device)
-        return cfl.train(num_rounds, local_epochs, batch_size, lr, test_loader, cluster_every=20)
+        return cfl.train(
+            num_rounds, local_epochs, batch_size, lr, test_loader, cluster_every=20
+        )
 
     def run_flhc(
         self,
