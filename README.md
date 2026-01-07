@@ -1,6 +1,14 @@
+git clone <repository-url>
+dvc init
+dvc repro prepare_data
+dvc repro train_mnist
+dvc repro train_fashion_mnist
+dvc metrics show
+dvc metrics diff
+dvc dag
 # FCCA: Federated CINN Clustering for Accurate Clustered Federated Learning
 
-This repository implements the FCCA (Federated cINN Clustering Algorithm) from the paper "Federated CINN Clustering for Accurate Clustered Federated Learning" (ICASSP 2024).
+This repository provides a complete implementation of the FCCA (Federated cINN Clustering Algorithm) and several clustered federated learning baselines from the paper "Federated CINN Clustering for Accurate Clustered Federated Learning" (ICASSP 2024).
 
 ## Overview
 
@@ -11,193 +19,231 @@ FCCA addresses the challenge of data heterogeneity in Federated Learning by clus
 - **Similarity Assessment**: Clusters clients based on learned distributions
 - **Cluster-wise Classifiers**: Train specialized models for each cluster
 
-## Features
+### FCCA Algorithm (4-Step Process)
 
-- ✅ PyTorch implementation of FCCA
-- ✅ Support for MNIST and Fashion-MNIST datasets
-- ✅ Non-IID data partitioning strategies (clustered, Dirichlet, label-based)
-- ✅ MLflow integration for experiment tracking
-- ✅ DVC for data versioning and pipeline management
-- ✅ Reproducible experiments with configuration files
-
-## Installation
-
-### Using uv (recommended)
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd fcca
-
-# Install dependencies with uv
-uv sync
-
-# Activate the virtual environment
-source .venv/bin/activate
-```
-
-### Using pip
-
-```bash
-pip install -e .
-```
-
-## Quick Start
-
-### Basic Training
-
-Train FCCA on MNIST with default settings:
-
-```bash
-python train.py --dataset mnist --num-clients 10 --num-clusters 5 --num-rounds 100
-```
-
-Train on Fashion-MNIST:
-
-```bash
-python train.py --dataset fashion_mnist --num-clients 10 --num-clusters 5 --num-rounds 100
-```
-
-### Using Configuration Files
-
-```bash
-python train.py --config configs/mnist_baseline.yaml
-```
-
-### With DVC Pipeline
-
-Initialize DVC (first time only):
-
-```bash
-dvc init
-```
-
-Run the complete pipeline:
-
-```bash
-# Prepare data
-dvc repro prepare_data
-
-# Train MNIST
-dvc repro train_mnist
-
-# Train Fashion-MNIST
-dvc repro train_fashion_mnist
-```
-
-## Project Structure
-
-```
-fcca/
-├── src/fcca/                 # Main package
-│   ├── models/              # Neural network models
-│   │   ├── encoder.py      # Global encoder
-│   │   ├── classifier.py   # Cluster-wise classifier
-│   │   └── cinn.py         # Conditional INN
-│   ├── federated/           # Federated learning components
-│   │   ├── client.py       # Client implementation
-│   │   ├── server.py       # Server implementation
-│   │   └── fcca.py         # Main FCCA algorithm
-│   ├── data/                # Data utilities
-│   │   ├── loaders.py      # Dataset loaders
-│   │   └── partition.py    # Data partitioning strategies
-│   └── utils/               # Utilities
-│       ├── config.py       # Configuration management
-│       └── mlflow_logger.py # MLflow integration
-├── configs/                 # Configuration files
-│   ├── mnist_baseline.yaml
-│   └── fashion_mnist_baseline.yaml
-├── train.py                 # Main training script
-├── dvc.yaml                 # DVC pipeline definition
-└── pyproject.toml          # Project dependencies
-
-## Algorithm Overview
-
-FCCA operates in 4 main steps:
-
-### Step 1: Train cINNs on Clients
+**Step 1: Train cINNs on Clients**  
 Each client trains a conditional Invertible Neural Network (cINN) to learn the distribution of their local encoded features, with the global encoder frozen.
 
-### Step 2: Train Encoders and Classifiers
+**Step 2: Train Encoders and Classifiers**  
 Clients train both the global encoder and cluster-wise classifier using their local data with cross-entropy loss.
 
-### Step 3: Clustering on Server
+**Step 3: Clustering on Server**  
 The server performs similarity assessment by:
 1. Generating synthetic samples from each client's cINN
 2. Computing similarity matrix based on distribution statistics
 3. Applying K-Means clustering
 
-### Step 4: Aggregation
+**Step 4: Aggregation**  
 - **Global Encoder**: Aggregated across all clients using federated averaging
 - **Cluster-wise Classifiers**: Aggregated within each cluster separately
 
+## What's in this repository
+
+- Single notebook/script with the full experimental suite (datasets, models, baselines, FCCA, and an experiment runner) in [src/fcca.py](src/fcca.py)
+- A Jupyter version of the same workflow in [src/notebooks/FCCA.ipynb](src/notebooks/FCCA.ipynb)
+- Baseline config templates in [configs/](configs) (reference only; not auto-loaded by the notebook)
+- Paper PDF in [docs/Federated_CINN_Clustering_for_Accurate_Clustered_Federated_Learning.pdf](docs/Federated_CINN_Clustering_for_Accurate_Clustered_Federated_Learning.pdf)
+- MLflow SQLite backend tracked by DVC in [mlflow.db.dvc](mlflow.db.dvc) (optional)
+
+### Implemented Features
+
+**Datasets:**
+- MNIST
+- Fashion-MNIST
+- CIFAR-10
+- CIFAR-100
+- Synthetic (following FedProx paper)
+
+**Algorithms:**
+- FedAvg (baseline)
+- IFCA (Iterative Federated Clustering Algorithm)
+- CFL (Clustered Federated Learning)
+- FL-HC (Federated Learning with Hierarchical Clustering)
+- FeSEM (Federated Expectation Maximization)
+- FCCA (Federated cINN Clustering Algorithm)
+- Commented code for personalized variants: FCCA+FedPer, FCCA+FedProx, FCCA+PerFedAvg
+
+**Model Architectures:**
+- 11-layer MLP (for MNIST, Fashion-MNIST, and Synthetic)
+- 18-layer CNN (for CIFAR-10 and CIFAR-100)
+
+**Data Partitioning:**
+- Dirichlet distribution-based non-IID partitioning with configurable concentration parameter α
+- Cluster-aware label exchange for simulating clustered FL settings
+
+## Install dependencies
+
+Using uv (recommended):
+
+```bash
+uv sync
+source .venv/bin/activate
+```
+
+Using pip:
+
+```bash
+pip install -e .
+```
+
+> The code relies on PyTorch, torchvision, scikit-learn, mlflow, FrEIA, and Jupyter. Installing via the commands above pulls all required packages from [pyproject.toml](pyproject.toml).
+
+## Running experiments
+
+### 1) Notebook workflow (recommended)
+
+- Open [src/notebooks/FCCA.ipynb](src/notebooks/FCCA.ipynb) (or [src/fcca.py](src/fcca.py) in VS Code/Jupyter) and run cells interactively.
+- Adjust the `DATASETS`, `ALGORITHMS`, `MODEL_TYPES`, `NUM_CLIENTS`, `NUM_CLUSTERS`, `NUM_ROUNDS`, and `LOCAL_EPOCHS` variables in the experiment cell before running the sweep.
+- Start small (e.g., 5–10 clients, 2–3 rounds) to verify everything before scaling up.
+
+### 2) Quick smoke test from the CLI
+
+```bash
+PYTHONPATH=src uv run python - <<'PY'
+from fcca import ExperimentRunner
+import torch
+
+runner = ExperimentRunner(device="cuda" if torch.cuda.is_available() else "cpu")
+
+    dataset_name="mnist",
+    algorithm="fcca",
+    model_type="mlp",
+    num_clients=5,
+    num_clusters=2,
+    num_rounds=2,
+    local_epochs=1,
+    batch_size=64,
+    lr=1e-2,
+    alpha=1.0,
+)
+print({k: v[-1] for k, v in history.items() if len(v)})
+PY
+```
+
+This imports the notebook code as a module (by adding `src` to `PYTHONPATH`) and runs a tiny FCCA experiment to confirm the stack works.
+
+### 3) Full sweep (slow)
+
+- The bottom of [src/fcca.py](src/fcca.py) defines the experiment grid. Increase `NUM_ROUNDS`, `NUM_CLIENTS`, and `LOCAL_EPOCHS` cautiously—the full paper settings (N=100, E=100, K=20) take hours to days.
+- CNN runs on CIFAR datasets are the most compute- and memory-intensive; reduce batch size or clients if you hit OOM.
+
 ## Configuration
 
-Key configuration parameters:
+While the notebook doesn't auto-load config files, the templates in [configs/](configs) show the paper's recommended hyperparameters:
 
 ```yaml
-training:
-  num_rounds: 100          # Number of federated rounds
-  num_clusters: 5          # Number of client clusters
-  batch_size: 32           # Batch size for local training
-  local_epochs: 5          # Local training epochs per round
-  cinn_lr: 0.001          # Learning rate for cINN
-  encoder_classifier_lr: 0.001  # Learning rate for encoder/classifier
-  clustering_interval: 10  # Perform clustering every N rounds
-
+# Example from configs/mnist_baseline.yaml
 model:
-  latent_dim: 64           # Dimension of latent space
+  latent_dim: 64
   encoder_hidden_dims: [128, 256, 512]
   classifier_hidden_dims: [256, 128]
-  cinn_num_blocks: 4       # Number of coupling blocks in cINN
+  cinn_num_blocks: 4
   cinn_hidden_dim: 128
+
+training:
+  num_rounds: 100
+  num_clusters: 5
+  batch_size: 32
+  local_epochs: 5
+  cinn_lr: 0.0001
+  encoder_classifier_lr: 0.001
+  clustering_interval: 10
+  warmup_rounds: 10
 
 data:
   num_clients: 10
-  partition_method: clustered  # iid, non_iid, dirichlet, clustered
+  partition_method: clustered
+  dirichlet_alpha: 0.5
 ```
 
-## Experiment Tracking
+In the notebook, adjust these values directly in the experiment runner call or in the global variables (`NUM_CLIENTS`, `NUM_ROUNDS`, etc.).
+
+## Experiment Tracking & Results
 
 ### MLflow
 
-View experiments in MLflow UI:
+The notebook sets the experiment name to `FCCA-Colab`. To view tracked runs:
 
 ```bash
-mlflow ui --backend-store-uri ./mlruns
+mlflow ui
 ```
 
 Then open http://localhost:5000 in your browser.
 
-### DVC
-
-Track experiments with DVC:
+The MLflow database (`mlflow.db`) is tracked by DVC, so you can restore previous experiment states:
 
 ```bash
-# Show metrics
-dvc metrics show
-
-# Compare experiments
-dvc metrics diff
-
-# Show pipeline DAG
-dvc dag
+dvc checkout mlflow.db.dvc
 ```
 
-## Results
+### Tracked Metrics
 
-The implementation tracks:
+Each experiment history dictionary contains:
 
-- Global accuracy (averaged across all clients)
-- Personalized accuracy (cluster-specific performance)
-- Cluster assignments over time
-- Silhouette scores for clustering quality
+- `test_acc`: Global test accuracy per round
+- `train_loss`: Average training loss per round
+- `cluster_assignments`: Client-to-cluster mapping over time (for clustered algorithms)
+- `silhouette_scores`: Clustering quality metrics (where applicable)
 
-Results are saved to:
+Use `ExperimentRunner.get_results_dataframe()` to convert results into a Pandas DataFrame for analysis.
 
-- `results/` directory (JSON files)
-- MLflow tracking server
-- DVC metrics
+### Reproducing Paper Results
+
+Paper settings (⚠️ **very slow**, days on CPU):
+- **Clients:** N = 100
+- **Clusters:** M = 5
+- **Rounds:** E = 100
+- **Local epochs:** K = 20
+- **Batch size:** 64
+- **Learning rate:** η = 0.01
+- **Dirichlet α:** 1.0
+
+Recommended testing settings (completes in ~1 hour):
+- **Clients:** N = 20
+- **Clusters:** M = 5
+- **Rounds:** E = 20
+- **Local epochs:** K = 5
+- **Batch size:** 64
+- **Learning rate:** η = 0.01
+- **Dirichlet α:** 1.0
+
+## Project Structure
+
+```
+fcca/
+├── src/
+│   ├── fcca.py                    # Main notebook-style script
+│   └── notebooks/
+│       └── FCCA.ipynb             # Jupyter notebook version
+├── configs/                        # Config templates (reference only)
+│   ├── mnist_baseline.yaml
+│   └── fashion_mnist_baseline.yaml
+├── docs/
+│   └── Federated_CINN_..._.pdf    # Original paper
+├── mlflow.db.dvc                  # DVC-tracked MLflow database
+├── pyproject.toml                 # Dependencies
+└── README.md
+```
+
+## Tips and Troubleshooting
+
+### Performance & Memory
+
+- **Out of Memory (OOM):** Reduce `batch_size` (64 → 32 → 16) or `num_clients`
+- **Too slow:** Reduce `num_rounds`, `local_epochs`, or use MLP instead of CNN
+- **GPU acceleration:** The code auto-detects CUDA; ensure PyTorch is installed with GPU support
+
+### Logging & Analysis
+
+- The script sets the MLflow experiment name to `FCCA-Colab`
+- Use `ExperimentRunner.get_results_dataframe()` to convert collected histories into a Pandas table for analysis/plotting
+- For reproducibility, seeds are fixed via `set_seed(42)` at import time
+
+### Common Issues
+
+1. **FrEIA import errors:** Ensure `FrEIA` is installed: `pip install FrEIA`
+2. **Dataset download failures:** Check internet connection; datasets auto-download to `./data/`
+3. **CUDA version mismatch:** Verify PyTorch CUDA version matches your driver
 
 ## Citation
 
@@ -223,3 +269,4 @@ If you use this code, please cite the original paper:
 ## License
 
 This project is for research and educational purposes.
+## Algorithm Overview
