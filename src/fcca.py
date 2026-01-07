@@ -203,6 +203,11 @@ def dirichlet_partition(
     """
     np.random.seed(seed)
 
+    if num_clusters > num_clients:
+        raise ValueError(
+            f"num_clusters ({num_clusters}) cannot be greater than num_clients ({num_clients})"
+        )
+
     # Get labels
     if hasattr(dataset, "targets"):
         labels = np.array(dataset.targets)
@@ -1868,9 +1873,9 @@ MODEL_TYPES = ["mlp", "cnn"]
 
 # Paper settings
 NUM_CLIENTS = 5
-NUM_CLUSTERS = 10
-NUM_ROUNDS = 3  # E=100 in paper
-LOCAL_EPOCHS = 3  # K=20 in paper
+NUM_CLUSTERS = 5
+NUM_ROUNDS = 5  # E=100 in paper
+LOCAL_EPOCHS = 5  # K=20 in paper
 BATCH_SIZE = 64
 LEARNING_RATE = 0.01  # η=0.01
 ALPHA = 1.0  # α=1.0 for Dirichlet
