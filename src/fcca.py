@@ -1201,8 +1201,14 @@ class FCCAClient:
         self.num_classes = num_classes
         self.cluster_id = 0
 
-    def train_cinn(self, lr: float = 1e-3, epochs: int = 5, batch_size: int = 64):
-        """Train cINN with frozen encoder"""
+    def train_cinn(
+        self,
+        lr: float = 1e-3,
+        epochs: int = 5,
+        batch_size: int = 64,
+        alpha: float = 1.0,
+    ):
+        """Train cINN with frozen encoder using Equation 3 from paper"""
         self.encoder.eval()
         self.cinn.train()
 
@@ -1214,19 +1220,27 @@ class FCCAClient:
             for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
 
-                # Get latent representation
+                # Get latent representation from frozen encoder
                 with torch.no_grad():
                     z = self.encoder(data)
 
                 # One-hot encode labels
                 y_onehot = F.one_hot(target, num_classes=self.num_classes).float()
 
-                # cINN forward: transform y_onehot using z as condition
+                # Forward: c(z_k; y_k, θ_c) maps z to standard normal
                 z_out, log_jac_det = self.cinn(y_onehot, z)
 
-                # Negative log-likelihood loss
-                loss = 0.5 * torch.sum(z_out**2, dim=1) - log_jac_det
-                loss = loss.mean()
+                # Reconstruction: c^-1(z'; y_k, θ_c) - sample z' from N(0,I)
+                z_prime = torch.randn_like(z_out)
+                z_reconstructed, _ = self.cinn(z_prime, y_onehot, rev=True)
+
+                # Equation 3: L_cMLE = (||c(z)||² + α||c^-1(z')||²)/2 - log|J|
+                forward_loss = 0.5 * torch.sum(z_out**2, dim=1)
+                reconstruction_loss = (
+                    0.5 * alpha * torch.sum((z_reconstructed - z.detach()) ** 2, dim=1)
+                )
+                nll_loss = forward_loss + reconstruction_loss - log_jac_det
+                loss = nll_loss.mean()
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -1273,7 +1287,7 @@ class FCCAClient:
         return total_loss / (epochs * len(loader)), acc
 
     def get_cinn_embedding(self, num_samples: int = 100):
-        """Get cINN embeddings for clustering"""
+        """Get cINN embeddings for clustering using inverse transform per Section 3.3"""
         self.encoder.eval()
         self.cinn.eval()
 
@@ -1287,13 +1301,30 @@ class FCCAClient:
                 data, target = data.to(self.device), target.to(self.device)
                 y_onehot = F.one_hot(target, num_classes=self.num_classes).float()
                 z_encoder = self.encoder(data)
+
+                # Forward transform to get latent representation
                 z_out, _ = self.cinn(y_onehot, z_encoder)
+
+                # Sample from standard normal for reconstruction
+                z_prime = torch.randn_like(z_out)
+
+                # Inverse transform: c^-1(z'; y_k) for similarity assessment (Eq 4)
+                z_reconstructed, _ = self.cinn(z_prime, y_onehot, rev=True)
+
+                # Combine both forward and reconstructed embeddings
                 embeddings.append(z_out.cpu().numpy())
+                embeddings.append(z_reconstructed.cpu().numpy())
                 break  # Only need one batch
 
         embeddings = np.concatenate(embeddings, axis=0)[:num_samples]
-        # Return mean and std as embedding features for better clustering
-        return np.concatenate([embeddings.mean(axis=0), embeddings.std(axis=0)])
+        # Return statistics of embeddings for clustering
+        return np.concatenate(
+            [
+                embeddings.mean(axis=0),
+                embeddings.std(axis=0),
+                np.median(embeddings, axis=0),
+            ]
+        )
 
 
 class FCCA:
@@ -1320,7 +1351,7 @@ class FCCA:
         for round_idx in tqdm(range(num_rounds), desc="FCCA"):
             # Step 1: Clients train cINN locally with frozen encoder (Algorithm 1, lines 3-7)
             for client in self.clients:
-                client.train_cinn(lr=cinn_lr, epochs=local_epochs, batch_size=batch_size)
+                client.train_cinn(lr=cinn_lr, epochs=local_epochs, batch_size=batch_size, alpha=1.0)
 
             # Step 2: Clustering every Δ rounds (Algorithm 1, lines 7-10)
             if round_idx % clustering_interval == 0:
