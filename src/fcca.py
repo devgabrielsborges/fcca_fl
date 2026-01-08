@@ -90,8 +90,11 @@ set_seed(42)
 # Configure MLflow tracking
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
-mlflow_db_path = os.getenv("MLFLOW_DB_PATH")
+load_dotenv()
+
+mlflow_db_path = os.getenv("MLFLOW_DB")
 mlflow.set_tracking_uri(f"sqlite:///{mlflow_db_path}")
 
 # Create or get experiment
