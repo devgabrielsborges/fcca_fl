@@ -90,6 +90,7 @@ set_seed(42)
 # Configure MLflow tracking
 import os
 from pathlib import Path
+
 mlflow_db_path = os.getenv("MLFLOW_DB_PATH")
 mlflow.set_tracking_uri(f"sqlite:///{mlflow_db_path}")
 
@@ -530,7 +531,7 @@ def create_models(
     classifier = ClusterWiseClassifier(num_clusters, latent_dim, num_classes)
 
     # Create cINN
-    cinn = ConditionalINN(num_classes, latent_dim, num_blocks=4, hidden_dim=128)
+    cinn = ConditionalINN(latent_dim, num_classes, num_blocks=4, hidden_dim=128)
 
     return encoder, classifier, cinn
 
@@ -1272,7 +1273,7 @@ class FCCAClient:
                 y_onehot = F.one_hot(target, num_classes=self.num_classes).float()
 
                 # Forward: c(z_k; y_k, θ_c) maps z to standard normal
-                z_out, log_jac_det = self.cinn(y_onehot, z)
+                z_out, log_jac_det = self.cinn(z, y_onehot)
 
                 # Reconstruction: c^-1(z'; y_k, θ_c) - sample z' from N(0,I)
                 z_prime = torch.randn_like(z_out)
@@ -1349,7 +1350,7 @@ class FCCAClient:
                 z_encoder = self.encoder(data)
 
                 # Forward transform to get latent representation
-                z_out, _ = self.cinn(y_onehot, z_encoder)
+                z_out, _ = self.cinn(z_encoder, y_onehot)
 
                 # Sample from standard normal for reconstruction
                 z_prime = torch.randn_like(z_out)
