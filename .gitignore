@@ -12,3 +12,5 @@ mlflow.db
 mlruns
 
 uv.lock
+
+.env
