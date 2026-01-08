@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-FCCA Experiments Runner
-Runs FCCA algorithm across all available datasets and model architectures.
+FCCA-Only Experiments Runner
+Runs ONLY FCCA algorithm across all available datasets and model architectures.
 
 Datasets: MNIST, Fashion-MNIST, CIFAR-10, CIFAR-100, Synthetic
 Models: MLP, CNN (CNN not used for Synthetic)
@@ -11,8 +11,8 @@ import sys
 import warnings
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add src to path if needed
+sys.path.insert(0, str(Path(__file__).parent))
 
 # Import necessary components from fcca.py
 from fcca import (
@@ -48,12 +48,13 @@ SEED = 42
 
 def main():
     print("=" * 80)
-    print("FCCA FEDERATED LEARNING EXPERIMENTS")
+    print("FCCA-ONLY FEDERATED LEARNING EXPERIMENTS")
     print("=" * 80)
     print(f"\nUsing device: {device}")
     print(f"MLflow tracking URI: {mlflow.get_tracking_uri()}")
 
     print("\nExperiment Configuration:")
+    print(f"  - Algorithm: FCCA ONLY")
     print(f"  - Clients: {NUM_CLIENTS}")
     print(f"  - Clusters: {NUM_CLUSTERS}")
     print(f"  - Rounds: {NUM_ROUNDS}")
@@ -72,6 +73,9 @@ def main():
             total_experiments += 1
 
     print(f"\nTotal FCCA experiments: {total_experiments}")
+    print(
+        f"(5 datasets × 2 models - 1 synthetic/CNN = {total_experiments} experiments)"
+    )
     print("=" * 80)
 
     # Initialize experiment runner
@@ -130,7 +134,7 @@ def main():
 
     # Print summary
     print("\n" + "=" * 80)
-    print("FCCA EXPERIMENTS SUMMARY")
+    print("FCCA-ONLY EXPERIMENTS SUMMARY")
     print("=" * 80)
     print(f"\nTotal experiments run: {experiment_count}")
     print(f"Successful: {len(successful_experiments)}")
@@ -148,7 +152,7 @@ def main():
             print(f"    Error: {error[:100]}...")
 
     print("\n" + "=" * 80)
-    print("ALL FCCA EXPERIMENTS COMPLETED!")
+    print("ALL FCCA-ONLY EXPERIMENTS COMPLETED!")
     print("=" * 80)
     print(f"\nResults logged to MLflow: {mlflow.get_tracking_uri()}")
     print("View results with: mlflow ui")
