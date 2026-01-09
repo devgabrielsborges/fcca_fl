@@ -73,9 +73,7 @@ def main():
             total_experiments += 1
 
     print(f"\nTotal FCCA experiments: {total_experiments}")
-    print(
-        f"(5 datasets × 2 models - 1 synthetic/CNN = {total_experiments} experiments)"
-    )
+    print(f"(5 datasets × 2 models - 1 synthetic/CNN = {total_experiments} experiments)")
     print("=" * 80)
 
     # Initialize experiment runner
